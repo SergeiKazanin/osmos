@@ -11,10 +11,10 @@ ESP8266WebServer server(80);
 
 int filterOnTime = 10;
 int filterOnFlush = 3;
-int flushingInterval = 6;
+
 boolean filterOn = false;
 int filterOnCount = 0;
-unsigned long ts = 0, tsFlush = 0, new_ts = 0, filterGlobal = 0;
+unsigned long ts = 0, tsFlush = 0, flushingInterval = 6, new_ts = 0, filterGlobal = 0, hourMils = 3600000, minMils = 60000;
 
 int EEPROM_int_read(int addr)
 {
@@ -77,6 +77,7 @@ const char HTTP_HTML[] PROGMEM = "<!DOCTYPE html>\
           <span>Flushing interval in hours: </span>\
           <input type=\"text\" name=\"flushingInterval\" value=\"{3}\" style=\"width:50px\">\
         </div>\
+        <span>Wifi signal strength: {4} </span>\
         <input class=\"button-send\" type=\"submit\" value=\"Send\">\
       </form>\
     </div>\
@@ -108,7 +109,7 @@ void handleRoot()
       }
       if (server.argName(i) == "flushingInterval")
       {
-        if (flushingInterval != server.arg(i).toInt())
+        if ((int)flushingInterval != server.arg(i).toInt())
         {
           flushingInterval = server.arg(i).toInt();
           change = true;
@@ -125,10 +126,11 @@ void handleRoot()
     EEPROM.commit();
   }
   String page = FPSTR(HTTP_HTML);
-  page.replace("{0}", String((int)filterOnCount));
-  page.replace("{1}", String((int)filterOnTime));
-  page.replace("{2}", String((int)filterOnFlush));
-  page.replace("{3}", String((int)flushingInterval));
+  page.replace("{0}", String(filterOnCount));
+  page.replace("{1}", String(filterOnTime));
+  page.replace("{2}", String(filterOnFlush));
+  page.replace("{3}", String(flushingInterval));
+  page.replace("{4}", String(WiFi.RSSI()));
   server.send(200, "text/html", page);
 }
 
@@ -184,7 +186,7 @@ void setup(void)
 void loop(void)
 {
   new_ts = millis();
-  if (new_ts - ts > 60000)
+  if (new_ts - ts > minMils)
   {
     ts = new_ts;
     if (filterOn == true)
@@ -197,9 +199,10 @@ void loop(void)
     }
   }
 
-  if (new_ts - tsFlush > (unsigned int)flushingInterval * (unsigned int)3600000)
+  if (new_ts - tsFlush > flushingInterval * hourMils)
   {
     tsFlush = new_ts;
+    ts = new_ts;
     filterOn = true;
     filterOnCount = filterOnFlush;
   }
