@@ -13,8 +13,8 @@ int filterOnTime = 10;
 int filterOnFlush = 3;
 
 boolean filterOn = false;
-int filterOnCount = 0;
-unsigned long ts = 0, tsFlush = 0, flushingInterval = 6, new_ts = 0, filterGlobal = 0, hourMils = 3600000, minMils = 60000;
+int filterOnCount = 0, flag = 0;
+unsigned long ts = 0, tsFlush = 0, flushingInterval = 6, new_ts = 0, hourMils = 3600000, minMils = 60000, tsButton = 0, buttonMils = 50;
 
 int EEPROM_int_read(int addr)
 {
@@ -159,17 +159,11 @@ void setup(void)
 {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(D6, OUTPUT);
+  pinMode(D7, INPUT_PULLUP);
   digitalWrite(LED_BUILTIN, 1);
   digitalWrite(D6, 0);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    digitalWrite(LED_BUILTIN, 0);
-    delay(50);
-    digitalWrite(LED_BUILTIN, 1);
-    delay(50);
-  }
 
   server.on("/", handleRoot);
   server.on("/filterOnCount", handleFilterOnCount);
@@ -177,6 +171,8 @@ void setup(void)
   server.on("/filterOffButton", handleFilterOffButton);
   server.begin();
   ts = millis();
+  tsFlush = millis();
+  tsButton = millis();
   EEPROM.begin(10);
   filterOnTime = EEPROM_int_read(0);
   filterOnFlush = EEPROM_int_read(2);
@@ -185,6 +181,13 @@ void setup(void)
 
 void loop(void)
 {
+  if (WiFi.status() != WL_CONNECTED && filterOn == false)
+  {
+    digitalWrite(LED_BUILTIN, 0);
+    delay(50);
+    digitalWrite(LED_BUILTIN, 1);
+    delay(50);
+  }
   new_ts = millis();
   if (new_ts - ts > minMils)
   {
@@ -219,4 +222,29 @@ void loop(void)
   }
 
   server.handleClient();
+
+  if (new_ts - tsButton >= buttonMils)
+  {
+    tsButton = millis();
+    if (digitalRead(D7) == LOW && flag == 0)
+    {
+      flag = 1;
+      if (filterOn == false)
+      {
+        filterOnCount = filterOnTime;
+        filterOn = true;
+        tsFlush = millis();
+        ts = millis();
+      }
+      else
+      {
+        filterOnCount = 0;
+        filterOn = false;
+      }
+    }
+  }
+  if (digitalRead(D7) == HIGH)
+  {
+    flag = 0;
+  }
 }

@@ -1,15 +1,16 @@
 {
-    "files.associations": {
-        "array": "cpp",
-        "chrono": "cpp",
-        "compare": "cpp",
-        "functional": "cpp",
-        "ostream": "cpp",
-        "ranges": "cpp",
-        "ratio": "cpp",
-        "tuple": "cpp",
-        "type_traits": "cpp",
-        "utility": "cpp",
-        "variant": "cpp"
-    }
+  "files.associations": {
+    "array": "cpp",
+    "chrono": "cpp",
+    "compare": "cpp",
+    "functional": "cpp",
+    "ostream": "cpp",
+    "ranges": "cpp",
+    "ratio": "cpp",
+    "tuple": "cpp",
+    "type_traits": "cpp",
+    "utility": "cpp",
+    "variant": "cpp",
+    "random": "cpp"
+  }
 }
