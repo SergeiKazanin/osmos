@@ -11,10 +11,11 @@ ESP8266WebServer server(80);
 
 int filterOnTime = 10;
 int filterOnFlush = 3;
+int flushingInterval = 6;
 
 boolean filterOn = false;
 int filterOnCount = 0, flag = 0;
-unsigned long ts = 0, tsFlush = 0, flushingInterval = 6, new_ts = 0, hourMils = 3600000, minMils = 60000, tsButton = 0, buttonMils = 50;
+unsigned long ts = 0, tsFlush = 0, new_ts = 0, hourMils = 3600000, minMils = 60000, tsButton = 0, buttonMils = 50;
 
 int EEPROM_int_read(int addr)
 {
@@ -109,7 +110,7 @@ void handleRoot()
       }
       if (server.argName(i) == "flushingInterval")
       {
-        if ((int)flushingInterval != server.arg(i).toInt())
+        if (flushingInterval != server.arg(i).toInt())
         {
           flushingInterval = server.arg(i).toInt();
           change = true;
@@ -133,24 +134,36 @@ void handleRoot()
   page.replace("{4}", String(WiFi.RSSI()));
   server.send(200, "text/html", page);
 }
-
-void handleFilterOnCount()
+void onFilter(int onTime)
 {
-  server.send(200, "text/plain", String((int)filterOnCount));
-}
-void handleFilterOnButton()
-{
-  filterOnCount = filterOnTime;
   filterOn = true;
   tsFlush = millis();
   ts = millis();
+  filterOnCount = onTime;
+  digitalWrite(LED_BUILTIN, 0);
+  digitalWrite(D6, 1);
+}
+void offFilter()
+{
+  filterOn = false;
+  filterOnCount = 0;
+  digitalWrite(LED_BUILTIN, 1);
+  digitalWrite(D6, 0);
+}
+
+void handleFilterOnCount()
+{
+  server.send(200, "text/plain", String(filterOnCount));
+}
+void handleFilterOnButton()
+{
+  onFilter(filterOnTime);
   server.sendHeader("Location", String("/"), true);
   server.send(302, "text/plain", "");
 }
 void handleFilterOffButton()
 {
-  filterOnCount = 0;
-  filterOn = false;
+  offFilter();
   server.sendHeader("Location", String("/"), true);
   server.send(302, "text/plain", "");
 }
@@ -189,7 +202,7 @@ void loop(void)
     delay(50);
   }
   new_ts = millis();
-  if (new_ts - ts > minMils)
+  if (new_ts - ts >= minMils)
   {
     ts = new_ts;
     if (filterOn == true)
@@ -198,53 +211,35 @@ void loop(void)
     }
     if (filterOnCount == 0)
     {
-      filterOn = false;
+      offFilter();
     }
   }
 
-  if (new_ts - tsFlush > flushingInterval * hourMils)
+  if (new_ts - tsFlush >= flushingInterval * hourMils)
   {
     tsFlush = new_ts;
-    ts = new_ts;
-    filterOn = true;
-    filterOnCount = filterOnFlush;
+    onFilter(filterOnFlush);
   }
-
-  if (filterOn == true)
-  {
-    digitalWrite(LED_BUILTIN, 0);
-    digitalWrite(D6, 1);
-  }
-  else
-  {
-    digitalWrite(LED_BUILTIN, 1);
-    digitalWrite(D6, 0);
-  }
-
-  server.handleClient();
 
   if (new_ts - tsButton >= buttonMils)
   {
-    tsButton = millis();
+    tsButton = new_ts;
     if (digitalRead(D7) == LOW && flag == 0)
     {
       flag = 1;
       if (filterOn == false)
       {
-        filterOnCount = filterOnTime;
-        filterOn = true;
-        tsFlush = millis();
-        ts = millis();
+        onFilter(filterOnTime);
       }
       else
       {
-        filterOnCount = 0;
-        filterOn = false;
+        offFilter();
       }
     }
+    if (digitalRead(D7) == HIGH)
+    {
+      flag = 0;
+    }
   }
-  if (digitalRead(D7) == HIGH)
-  {
-    flag = 0;
-  }
+  server.handleClient();
 }
