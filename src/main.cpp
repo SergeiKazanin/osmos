@@ -15,7 +15,8 @@ int flushingInterval = 6;
 
 boolean filterOn = false;
 int filterOnCount = 0, flag = 0;
-unsigned long ts = 0, tsFlush = 0, new_ts = 0, hourMils = 3600000, minMils = 60000, tsButton = 0, buttonMils = 50;
+unsigned long ts = 0, tsFlush = 0, new_ts = 0, hourMils = 3600000, minMils = 60000, tsButton = 0, buttonMils = 50, tsSec = 0;
+unsigned long upTime = 0, totalTimeOnFilter = 0;
 
 int EEPROM_int_read(int addr)
 {
@@ -34,6 +35,40 @@ void EEPROM_int_write(int addr, int num)
   {
     EEPROM.write(addr + i, raw[i]);
   }
+}
+String getReadableTime(unsigned long time)
+{
+  String readableTime;
+  unsigned long minutes;
+  unsigned long hours;
+  unsigned long days;
+
+  minutes = time / 60;
+  hours = minutes / 60;
+  days = hours / 24;
+  time %= 60;
+  minutes %= 60;
+  hours %= 24;
+
+  if (days > 0)
+  {
+    readableTime = String(days) + " days ";
+  }
+  if (hours > 0)
+  {
+    readableTime += String(hours) + ":";
+  }
+  if (minutes < 10)
+  {
+    readableTime += "0";
+  }
+  readableTime += String(minutes) + ":";
+  if (time < 10)
+  {
+    readableTime += "0";
+  }
+  readableTime += String(time);
+  return readableTime;
 }
 
 const char HTTP_HTML[] PROGMEM = "<!DOCTYPE html>\
@@ -79,6 +114,8 @@ const char HTTP_HTML[] PROGMEM = "<!DOCTYPE html>\
           <input type=\"text\" name=\"flushingInterval\" value=\"{3}\" style=\"width:50px\">\
         </div>\
         <span>Wifi signal strength: {4} </span>\
+        <span>Up time: {5} </span>\
+        <span>Total filtration time : {6} </span>\
         <input class=\"button-send\" type=\"submit\" value=\"Send\">\
       </form>\
     </div>\
@@ -132,6 +169,8 @@ void handleRoot()
   page.replace("{2}", String(filterOnFlush));
   page.replace("{3}", String(flushingInterval));
   page.replace("{4}", String(WiFi.RSSI()));
+  page.replace("{5}", String(getReadableTime(upTime)));
+  page.replace("{6}", String(totalTimeOnFilter));
   server.send(200, "text/html", page);
 }
 void onFilter(int onTime)
@@ -140,6 +179,7 @@ void onFilter(int onTime)
   tsFlush = millis();
   ts = millis();
   filterOnCount = onTime;
+  totalTimeOnFilter += onTime;
   digitalWrite(LED_BUILTIN, 0);
   digitalWrite(D6, 1);
 }
@@ -194,13 +234,8 @@ void setup(void)
 
 void loop(void)
 {
-  if (WiFi.status() != WL_CONNECTED && filterOn == false)
-  {
-    digitalWrite(LED_BUILTIN, 0);
-    delay(50);
-    digitalWrite(LED_BUILTIN, 1);
-    delay(50);
-  }
+  server.handleClient();
+
   new_ts = millis();
   if (new_ts - ts >= minMils)
   {
@@ -240,6 +275,17 @@ void loop(void)
     {
       flag = 0;
     }
+    if (WiFi.status() != WL_CONNECTED && filterOn == false)
+    {
+      digitalWrite(LED_BUILTIN, 0);
+      delay(1);
+      digitalWrite(LED_BUILTIN, 1);
+    }
   }
-  server.handleClient();
+
+  if (new_ts - tsSec >= 1000)
+  {
+    tsSec = new_ts;
+    upTime++;
+  }
 }
